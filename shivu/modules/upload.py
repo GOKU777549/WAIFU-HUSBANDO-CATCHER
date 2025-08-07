@@ -243,6 +243,34 @@ async def fdrop(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         await update.message.reply_text(f"Error while dropping: {e}")
 
+async def guess(update: Update, context: CallbackContext) -> None:
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+
+    if chat_id not in active_drops:
+        await update.message.reply_text("No character is currently dropped in this chat.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Please guess the character name. Usage: /guess <name>")
+        return
+
+    guess_name = " ".join(context.args).lower()
+    character = active_drops[chat_id]
+
+    if guess_name == character["name"]:
+        await update.message.reply_text(
+            f"🎉 <a href='tg://user?id={user.id}'>{user.first_name}</a> correctly guessed the character!\n"
+            f"You added <b>{character['name']}</b> from <b>{character['anime']}</b> to your harem!",
+            parse_mode=ParseMode.HTML
+        )
+        # You could add DB insert here to save the character to user's harem
+        del active_drops[chat_id]
+    else:
+        await update.message.reply_text("❌ Wrong guess! Try again.")
+
+GUESS_HANDLER = CommandHandler('guess', guess, block=False)
+application.add_handler(GUESS_HANDLER)
 FDROP_HANDLER = CommandHandler('fdrop', fdrop, block=False)
 application.add_handler(FDROP_HANDLER)
 UPLOAD_HANDLER = CommandHandler('upload', upload, block=False)
