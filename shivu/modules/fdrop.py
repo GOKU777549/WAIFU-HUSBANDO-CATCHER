@@ -23,3 +23,6 @@ async def fdrop(update: Update, context: CallbackContext) -> None:
         )
     except Exception as e:
         await update.message.reply_text(f"Error while dropping: {e}")
+
+FDROP_HANDLER = CommandHandler('fdrop', fdrop, block=False)
+application.add_handler(FDROP_HANDLER)
