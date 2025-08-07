@@ -203,6 +203,9 @@ async def update(update: Update, context: CallbackContext) -> None:
 import random
 from telegram.constants import ParseMode
 
+# Store dropped characters per chat (optional: can be replaced with DB for persistence)
+active_drops = {}
+
 async def fdrop(update: Update, context: CallbackContext) -> None:
     if str(update.effective_user.id) not in sudo_users:
         await update.message.reply_text("You're not allowed to use this command.")
@@ -215,14 +218,28 @@ async def fdrop(update: Update, context: CallbackContext) -> None:
             return
 
         character = characters[0]
-        await update.message.reply_photo(
+        chat_id = update.effective_chat.id
+
+        # Save the character for this chat (to be guessed)
+        active_drops[chat_id] = {
+            "id": character["id"],
+            "name": character["name"].lower(),  # case insensitive match
+            "img_url": character["img_url"],
+            "rarity": character["rarity"],
+            "anime": character["anime"]
+        }
+
+        # Send the drop message (without name)
+        await context.bot.send_photo(
+            chat_id=chat_id,
             photo=character["img_url"],
-            caption=f"<b>Character Name:</b> {character['name']}\n"
-                    f"<b>Anime Name:</b> {character['anime']}\n"
-                    f"<b>Rarity:</b> {character['rarity']}\n"
-                    f"<b>ID:</b> {character['id']}",
+            caption=(
+                f"A New {character['rarity']} Character Appeared...\n\n"
+                f"Use <code>/guess character name</code> to add it to your harem!"
+            ),
             parse_mode=ParseMode.HTML
         )
+
     except Exception as e:
         await update.message.reply_text(f"Error while dropping: {e}")
 
