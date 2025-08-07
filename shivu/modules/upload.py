@@ -35,52 +35,83 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
     try:
         args = context.args
-        if len(args) != 4:
+        reply = update.message.reply_to_message
+
+        # Photo reply ke sath command: /upload muzan-kibutsuji demon-slayer 3
+        # URL ke sath command: /upload <image_url> muzan-kibutsuji demon-slayer 3
+
+        if (reply and reply.photo and len(args) == 3):
+            img_url = reply.photo[-1].file_id
+            character_name = args[0].replace('-', ' ').title()
+            anime = args[1].replace('-', ' ').title()
+            rarity_input = args[2]
+        elif (not reply and len(args) == 4):
+            img_url = args[0]
+            character_name = args[1].replace('-', ' ').title()
+            anime = args[2].replace('-', ' ').title()
+            rarity_input = args[3]
+            try:
+                urllib.request.urlopen(img_url)
+            except:
+                await update.message.reply_text('Invalid URL.')
+                return
+        else:
             await update.message.reply_text(WRONG_FORMAT_TEXT)
             return
 
-        character_name = args[1].replace('-', ' ').title()
-        anime = args[2].replace('-', ' ').title()
+        # Rarity map
+        rarity_map = {
+            1: "⚪ Common",
+            2: "🟣 Rare",
+            3: "🟡 Legendary",
+            4: "🟢 Medium"
+        }
 
         try:
-            urllib.request.urlopen(args[0])
-        except:
-            await update.message.reply_text('Invalid URL.')
-            return
-
-        rarity_map = {1: "⚪ Common", 2: "🟣 Rare", 3: "🟡 Legendary", 4: "🟢 Medium"}
-        try:
-            rarity = rarity_map[int(args[3])]
+            rarity = rarity_map[int(rarity_input)]
         except KeyError:
-            await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, 4, or 5.')
+            await update.message.reply_text('Invalid rarity. Please use 1, 2, 3, or 4.')
             return
 
+        # ID generate
         id = str(await get_next_sequence_number('character_id')).zfill(2)
 
         character = {
-            'img_url': args[0],
+            'img_url': img_url,
             'name': character_name,
             'anime': anime,
             'rarity': rarity,
             'id': id
         }
 
+        # Send to channel
         try:
             message = await context.bot.send_photo(
                 chat_id=CHARA_CHANNEL_ID,
-                photo=args[0],
-                caption=f'<b>Character Name:</b> {character_name}\n<b>Anime Name:</b> {anime}\n<b>Rarity:</b> {rarity}\n<b>ID:</b> {id}\nAdded by <a href="tg://user?id={update.effective_user.id}">{update.effective_user.first_name}</a>',
+                photo=img_url,
+                caption=(
+                    f'<b>Character Name:</b> {character_name}\n'
+                    f'<b>Anime Name:</b> {anime}\n'
+                    f'<b>Rarity:</b> {rarity}\n'
+                    f'<b>ID:</b> {id}\n'
+                    f'Added by <a href="tg://user?id={update.effective_user.id}">'
+                    f'{update.effective_user.first_name}</a>'
+                ),
                 parse_mode='HTML'
             )
             character['message_id'] = message.message_id
             await collection.insert_one(character)
-            await update.message.reply_text('CHARACTER ADDED....')
-        except:
+            await update.message.reply_text('✅ CHARACTER ADDED SUCCESSFULLY')
+        except Exception as e:
             await collection.insert_one(character)
-            update.effective_message.reply_text("Character Added but no Database Channel Found, Consider adding one.")
-        
+            await update.message.reply_text(
+                f"Character Added to DB but couldn't send to channel.\nError: {e}"
+            )
+
     except Exception as e:
-        await update.message.reply_text(f'Character Upload Unsuccessful. Error: {str(e)}\nIf you think this is a source error, forward to: {SUPPORT_CHAT}')
+        await update.message.reply_text(
+            f'Character Upload Unsuccessful. Error: {str(e)}\nIf you think this is a source error, contact: {SUPPORT_CHAT}'
+        )
 
 async def delete(update: Update, context: CallbackContext) -> None:
     if str(update.effective_user.id) not in sudo_users:
